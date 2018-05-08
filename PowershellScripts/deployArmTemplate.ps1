@@ -77,9 +77,12 @@ function Login
 		if (-not (Test-Path $azureProfileFile))
 		{
 			Login-AzureRmAccount -SubscriptionId $subscriptionId
-			Get-AzureRmSubscription -SubscriptionId $subscriptionId -TenantId $tenantId | Set-AzureRmContext
-			Write-Host "Saving profile cookie to $azureProfileFile so that you don't have to login interactively every time"
-			Save-AzureRmContext -Force -Path $azureProfileFile
+			if (![string]::IsNullOrEmpty($(Get-AzureRmContext).Account))
+			{
+				Get-AzureRmSubscription -SubscriptionId $subscriptionId -TenantId $tenantId | Set-AzureRmContext
+				Write-Host "Saving profile cookie to $azureProfileFile so that you don't have to login interactively every time"
+				Save-AzureRmContext -Force -Path $azureProfileFile
+			}
 		} 
 		else
 		{
@@ -88,21 +91,50 @@ function Login
     }
 }
 
-# Set Environment
-if (!($deployEnvironment -eq '') -and !($templateParameterFile -like "*$deployEnvironment.json*"))
+function CreateDataFactory
 {
-	Write-Host "Environment detected, appending '$deployEnvironment' to parameters filename"
-	$templateParameterFile = $templateParameterFile.replace(".json", "_$deployEnvironment.json");
+	## Data Factory Specific code - Should be refactored to an external script
+	$parametersContent = (Get-Content $templateParameterFile | Out-String | ConvertFrom-Json)
+	$dataFactoryName = $parametersContent.parameters.factoryName.value
+	if ($dataFactoryName)
+	{
+		Get-AzureRmDataFactoryV2 -Name $dataFactoryName -ResourceGroupName $resourceGroup -ErrorVariable dataFactoryNotPresent -ErrorAction SilentlyContinue
+		if ($dataFactoryNotPresent)
+		{
+			Write-Host "Creating Data Factory $dataFactoryName"
+			Set-AzureRmDataFactoryV2 -ResourceGroupName $resourceGroup -Location 'West Europe' -Name $dataFactoryName
+			Write-Host "Resource Group $resourceGroup created"
+		}
+	}	
 }
 
-Login
+function CreateResourceGroup
+{
+	Get-AzureRmResourceGroup -Name $resourceGroup -ErrorVariable resourceGroupNotPresent -ErrorAction SilentlyContinue
+
+	if ($resourceGroupNotPresent)
+	{
+		Write-Host "Creating Resource Group $resourceGroup"
+		New-AzureRmResourceGroup $resourceGroup -location 'West Europe'
+		Write-Host "Resource Group $resourceGroup created"
+	}
+}
+
+# Set Environment
+if (!($env -eq '') -and !($templateParameterFile -like "*$env.json*"))
+{
+	Write-Host "Environment detected, appending '$env' to parameters filename"
+	$templateParameterFile = $templateParameterFile.replace(".json", "_$env.json");
+}
 
 # Get absolute paths
 $templateFile = "$templatesDirectory\$templateFile"
 $templateParameterFile = "$templatesDirectory\$templateParameterFile"
+
+Login
+CreateResourceGroup
+CreateDataFactory
  
-Write-Host "Deploying to $resourceGroup with file $templateFile and configuration $templateParameterFile..."
-
+Write-Host "Deploying to $resourceGroup with file $templateFile and configuration $templateParameterFile"
 New-AzureRmResourceGroupDeployment -Name MyARMDeployment -ResourceGroupName $resourceGroup -TemplateFile $templateFile -TemplateParameterFile $templateParameterFile
-
-Write-Host "Deployment end"
+Write-Host "Deployment finished"
