@@ -7,7 +7,7 @@
    
    The following variables are supported:
    
-   deployEnvironment : Defines the environment of deployment. When set, the script appends _{deployEnvironment} to {templateParameterFile} if it hasn't been specified. This is useful when we want have several environments (development, integration, production) and want to keep configuration separated.
+   env : Defines the environment of deployment. When set, the script appends _{env} to {templateParameterFile} if it hasn't been specified. This is useful when we want have several environments (development, integration, production) and want to keep configuration separated.
    templatesDirectory : Full path to where the ARM template files are located. Defaults to path where the script is being run from
    templateFile : The ARM template file to process. Defaults to "template.json"
    templateParameterFile : Parameters replacement file to apply to {templateFile}. Defaults to "parameters.json"
@@ -15,13 +15,13 @@
    tenantId : Azure TenantId for login purposes
    resourceGroup : Azure Resource Group where the Data Factories will be deployed to
 .EXAMPLE
-   ./deployArmTemplate.ps1 -deployEnvironment Dev
+   ./deployArmTemplate.ps1 -env Dev
 .EXAMPLE
 	./deployArmTemplate.ps1 -templateParameterFile "myTestDf_Integration.json" -templatesDirectory "C:\Development\MyDataFactories\MyTestDf"
 #>
 
 Param(
-  [string]$deployEnvironment,
+  [string]$env,
   [string]$resourceGroup = $(Throw "ResourceGroup name must be provided"),
   [string]$templatesDirectory = $PSScriptRoot,
   [string]$templateFile = "template.json",
@@ -37,7 +37,7 @@ Write-Host "templateFile $templateFile"
 Write-Host "templateParameterFile $templateParameterFile"
 Write-Host "subscriptionId $subscriptionId"
 Write-Host "tenantId $tenantId"
-Write-Host "deployEnvironment $deployEnvironment"
+Write-Host "env $env"
 
 function Login
 {
